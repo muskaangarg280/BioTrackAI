@@ -85,7 +85,7 @@ def simulate_heart_rate(time_of_day, activity_level, age, health_condition, fitn
         hr -= random.uniform(5, 10)
     
     if health_condition == "stress":
-        hr += random.uniform(10, 20)  
+        hr += random.uniform(10, 18)  
     elif health_condition == "hypertension":
         hr += random.uniform(5, 15)  
     elif health_condition == "diabetes":
