@@ -3,249 +3,334 @@ import pandas as pd
 import random
 import datetime
 import matplotlib.pyplot as plt
+from scipy.stats import truncnorm
 
-# Function to create a randomized user profile (age, gender, health conditions, altitude, fitness level)
+"""
+Real-World Wearable Vital-Sign Simulator
+=======================================
+• **Sampling cadence:** **1-minute** intervals – typical of consumer smartwatches and clinical wearable patches.
+• **Scenarios with realistic durations (in minutes):**
+  ─ `asthma_attack` …… 10–30 min  
+  ─ `panic_attack`  …… 10–20 min  
+  ─ `febrile_sepsis` … 240–480 min (4-8 h)  
+  ─ `post_op_infection` … 360–720 min (6-12 h)
+• **3 % random NaNs** as drop-out artifacts.
+• Keeps all prior physiology (BMI, pregnancy, comorbidities, medication effects, circadian rhythm).
+"""
+
+# ------------------------- Helper utilities ------------------------- #
+
+def trunc_norm(mu: float, sigma: float, low: float, high: float) -> float:
+    a, b = (low - mu) / sigma, (high - mu) / sigma
+    return truncnorm.rvs(a, b, loc=mu, scale=sigma)
+
+
+def circadian_temp(hour: int, base: float = 36.8, amp: float = 0.3, peak_hour: int = 17) -> float:
+    phase = 2 * np.pi * ((hour - peak_hour) % 24) / 24
+    return base + amp * np.sin(phase)
+
+# ----------------------- Profile generation ------------------------ #
+
 def create_user_profile():
-    # Random age between 18 and 80, with higher chance of middle-aged
     age_weights = [0.15] * 10 + [0.25] * 13 + [0.25] * 20 + [0.15] * 10 + [0.05] * 10
-    assert len(age_weights) == 63, f"Age weights should have 63 elements, but it has {len(age_weights)}"
-    
     age = random.choices(range(18, 81), weights=age_weights, k=1)[0]
-    gender = random.choice(['male', 'female'])  # Randomize gender
-    health_condition = random.choices(
-        ['healthy', 'stress', 'hypertension', 'asthma', 'sleep_apnea', 'diabetes', 'cardiovascular_disease', 'obesity', 'chronic_kidney_disease', 'arthritis'],
-        weights=[0.60, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.02, 0.03],  
-        k=1
-    )[0]
-    
-    altitude = random.choices([0, 1, 2], weights=[0.85, 0.10, 0.05], k=1)[0]  
-    fitness_level = random.choices(['low', 'moderate', 'high'], weights=[0.4, 0.5, 0.1], k=1)[0]  
-    medications = random.choices([None, 'beta_blockers', 'ace_inhibitors', 'bronchodilators'], weights=[0.85, 0.05, 0.05, 0.05], k=1)[0]  
-    
-    return age, gender, health_condition, altitude, fitness_level, medications
+    gender = random.choice(["male", "female"])
 
-# Simulate Body Temperature
-def simulate_temperature(time_of_day, health_condition, age, altitude, activity_level, last_meal_time=None):
-    base_temp = random.uniform(36.3, 36.7)
-    if age > 60:
-        base_temp -= random.uniform(0.1, 0.2)  
-    
-    if altitude == 1:  
-        base_temp -= random.uniform(0.1, 0.2)  
-    elif altitude == 2:  
-        base_temp -= random.uniform(0.2, 0.4)  
-    
-    if time_of_day in range(6, 9):  
-        temp = base_temp - random.uniform(0.1, 0.3)
-    elif time_of_day in range(9, 18):  
-        temp = base_temp + random.uniform(0.1, 0.2)
-        if activity_level == "high":
-            temp += random.uniform(0.3, 0.5)  
-    else:  
-        temp = base_temp - random.uniform(0.2, 0.3)
-    
-    if health_condition == "stress":
-        temp += random.uniform(0.2, 0.4)
-    elif health_condition == "fever":
-        temp += random.uniform(0.5, 1.0)
-    elif health_condition == "obesity":
-        temp += random.uniform(0.1, 0.3)
-    
-    if last_meal_time and time_of_day in last_meal_time:
-        temp += random.uniform(0.1, 0.3)  
-    
-    return round(temp, 1)
+    high_impact = [
+        ("chronic_pain", 0.08), ("thyroid_disorder", 0.07), ("cancer", 0.05),
+        ("COPD", 0.04), ("anemia", 0.06), ("smoking", 0.25)
+    ]
+    common = [
+        ("stress", 0.10), ("hypertension", 0.15), ("asthma", 0.07),
+        ("sleep_apnea", 0.08), ("diabetes", 0.10), ("cardiovascular_disease", 0.10),
+        ("obesity", 0.20), ("chronic_kidney_disease", 0.03), ("arthritis", 0.05),
+        ("beta_blockers", 0.07), ("bronchodilators", 0.05), ("ace_inhibitors", 0.04)
+    ]
+    problems = [c for c, p in (common + high_impact) if random.random() < p] or ["none"]
 
-# Simulate heart rate
-def simulate_heart_rate(time_of_day, activity_level, age, health_condition, fitness_level, medications):
-    base_hr = random.uniform(75, 85)
-    
+    pregnant = False
+    if gender == "female" and 18 <= age <= 45:
+        pregnant = random.random() < 0.15
+
+    bmi = max(15, min(45, round(random.gauss(25, 4), 1)))
+    altitude = random.choices([0, 1, 2], weights=[0.85, 0.10, 0.05])[0]
+    fitness = random.choices(["low", "moderate", "high"], weights=[0.4, 0.5, 0.1])[0]
+
+    return age, gender, problems, altitude, fitness, bmi, pregnant
+
+
+# -------------------- Vital‑sign simulators ------------------------ #
+
+def simulate_heart_rate(hour, activity, age, problems, fit, bmi, pregnant):
+    hr = trunc_norm(72, 8, 45, 110)
     if age > 50:
-        base_hr -= random.uniform(5, 10) 
-    
-    if fitness_level == "high":
-        base_hr -= random.uniform(5, 10)
-    elif fitness_level == "low":
-        base_hr += random.uniform(5, 10)
-    
-    if time_of_day in range(6, 9):  
-        hr = base_hr + random.uniform(3, 12)
-    elif time_of_day in range(9, 12):  
-        hr = base_hr + random.uniform(8, 25)
-    elif time_of_day in range(12, 18):  
-        hr = base_hr + random.uniform(25, 45)
-    elif time_of_day in range(18, 22):  
-        hr = base_hr + random.uniform(2, 12)
-    else:  
-        hr = base_hr - random.uniform(3, 8)
-    
-    if activity_level == "high":
-        hr += random.uniform(25, 35)
-    elif activity_level == "low":
-        hr -= random.uniform(5, 10)
-    
-    if health_condition == "stress":
-        hr += random.uniform(10, 18)  
-    elif health_condition == "hypertension":
-        hr += random.uniform(5, 15)  
-    elif health_condition == "diabetes":
-        hr += random.uniform(5, 10)  
-    
-    if medications == "beta_blockers":
-        hr -= random.uniform(10, 20)  
-    elif medications == "ace_inhibitors":
-        hr -= random.uniform(5, 10)  
-    elif medications == "bronchodilators":
-        hr += random.uniform(5, 10)  
-    
-    return round(hr, 1)
+        hr += 5
+    if fit == "high":
+        hr -= 10
+    elif fit == "low":
+        hr += 8
 
-# Simulate blood pressure
-def simulate_blood_pressure(time_of_day, activity_level, health_condition, age, medications, last_meal_time=None):
-    systolic = 120  
-    diastolic = 80
-    
-    if age > 50:
-        systolic += random.uniform(5, 10)
-        diastolic += random.uniform(3, 5)
-    
-    if activity_level == "low":
-        systolic += random.uniform(5, 10)
-        diastolic += random.uniform(5, 10)
-    
-    if health_condition == "hypertension":
-        systolic += random.uniform(15, 30)
-        diastolic += random.uniform(10, 20)
-    elif health_condition == "stress":
-        systolic += random.uniform(5, 15)
-        diastolic += random.uniform(3, 10)
-    
-    if medications == "beta_blockers":
-        systolic -= random.uniform(10, 20)
-        diastolic -= random.uniform(5, 10)
-    elif medications == "ace_inhibitors":
-        systolic -= random.uniform(5, 10)
-        diastolic -= random.uniform(3, 7)
-    
-    if time_of_day in range(6, 9):  
-        systolic += random.uniform(5, 10)
-        diastolic += random.uniform(3, 5)
-    elif time_of_day in range(12, 18):  
-        systolic += random.uniform(20, 40)
-        diastolic += random.uniform(10, 15)
-    elif time_of_day in range(18, 22):  
-        systolic -= random.uniform(5, 10)
-        diastolic -= random.uniform(3, 5)
+    # Activity load
+    if activity == "high":
+        hr += random.uniform(40, 70)
+    elif activity == "moderate":
+        hr += random.uniform(20, 40)
 
-    if last_meal_time and time_of_day in last_meal_time:
-        systolic += random.uniform(5, 10)
-        diastolic += random.uniform(3, 5)
-    
-    return round(systolic, 1), round(diastolic, 1)
+    # Condition modifiers
+    if bmi >= 30 or "obesity" in problems:
+        hr += 5
+    if "stress" in problems or "chronic_pain" in problems:
+        hr += 5
+    if "smoking" in problems:
+        hr += 5
+    if "thyroid_disorder" in problems and random.random() < 0.5:  # hyperthyroid half the time
+        hr += 10
+    if "thyroid_disorder" in problems and random.random() >= 0.5:
+        hr -= 10
+    if "anemia" in problems:
+        hr += 8
+    if "beta_blockers" in problems:
+        hr -= random.uniform(10, 15)
+    if "bronchodilators" in problems:
+        hr += 5
+    if pregnant:
+        hr += 10
 
-# Function to simulate blood oxygen saturation (SpO2) based on altitude and health conditions
-def simulate_spo2(altitude, health_condition):
-    if altitude == 0:  
-        spo2 = random.uniform(95, 100)
-    elif altitude == 1:  
-        spo2 = random.uniform(90, 95)
-    else:  
-        spo2 = random.uniform(85, 90)
-    
-    if health_condition == "asthma":
-        spo2 = random.uniform(85, 95)
-    elif health_condition == "sleep_apnea":
-        spo2 = random.uniform(80, 90)
-    
-    return round(spo2, 1)
+    return round(max(hr, 40), 1)
 
-# Function to simulate respiratory rate (RR) based on activity, health condition, and age
-def simulate_rr(time_of_day, activity_level, health_condition, age):
-    base_rr = random.uniform(15, 18)  
-    
+
+def simulate_temperature(hour, problems, age, altitude, activity, bmi, pregnant):
+    temp = circadian_temp(hour)
+
     if age > 60:
-        base_rr += random.uniform(1, 3)  
-    
-    if time_of_day in range(6, 9):  
-        rr = base_rr - random.uniform(1, 2)
-    elif time_of_day in range(9, 12):  
-        rr = base_rr + random.uniform(1, 3)
-    elif time_of_day in range(12, 18):  
-        rr = base_rr + random.uniform(5, 8)
-    elif time_of_day in range(18, 22):  
-        rr = base_rr + random.uniform(2, 3)
-    else:  
-        rr = base_rr - random.uniform(1, 3)
-    
-    if activity_level == "high":
-        rr += random.uniform(3, 5)
-    elif activity_level == "low":
-        rr -= random.uniform(1, 2)
-    
-    if health_condition == "stress":
-        rr += random.uniform(2, 5)  
-    
+        temp -= 0.1
+    if altitude == 1:
+        temp -= 0.1
+    elif altitude == 2:
+        temp -= 0.2
+    if activity == "high":
+        temp += 0.3
+
+    # Conditions
+    if bmi >= 30 or "obesity" in problems:
+        temp += 0.2
+    if "stress" in problems or "chronic_pain" in problems:
+        temp += 0.1
+    if "thyroid_disorder" in problems and random.random() < 0.5:  # hyper
+        temp += 0.3
+    if "thyroid_disorder" in problems and random.random() >= 0.5:  # hypo
+        temp -= 0.3
+    if pregnant:
+        temp += 0.3
+
+    return round(temp + random.uniform(-0.2, 0.2), 1)
+
+
+def simulate_blood_pressure(hour, activity, problems, age, bmi, pregnant):
+    sys, dia = 115, 75
+
+    if age > 50:
+        sys += 5; dia += 3
+    if bmi >= 30 or "obesity" in problems:
+        sys += 5; dia += 3
+    if pregnant:
+        sys += 5; dia += 2
+
+    if "hypertension" in problems:
+        sys += 20; dia += 15
+    if "beta_blockers" in problems:
+        sys -= 10; dia -= 5
+    if "ace_inhibitors" in problems:
+        sys -= 5; dia -= 3
+    if "smoking" in problems:
+        sys += 5; dia += 3
+    if "stress" in problems or "chronic_pain" in problems:
+        sys += 5; dia += 3
+    if "thyroid_disorder" in problems and random.random() < 0.5:
+        sys += 5
+    if "thyroid_disorder" in problems and random.random() >= 0.5:
+        sys -= 5
+
+    # Activity influence
+    if activity == "high":
+        sys += 10; dia += 5
+    elif activity == "low":
+        sys -= 5; dia -= 3
+    if hour in range(12, 18):
+        sys += 5
+
+    return round(sys, 1), round(dia, 1)
+
+
+def simulate_spo2(altitude, problems, bmi, pregnant):
+    spo2 = 98 - altitude * 3  # ~‑3% per 1000‑1500m bucket
+
+    if "COPD" in problems:
+        spo2 -= 5
+    if "asthma" in problems:
+        spo2 -= 3
+    if "sleep_apnea" in problems:
+        spo2 -= 5
+    if "smoking" in problems:
+        spo2 -= 3
+    if "anemia" in problems:
+        spo2 -= 1
+
+    return round(max(spo2 + random.uniform(-1.5, 1.5), 80), 1)
+
+
+def simulate_rr(hour, activity, problems, age, bmi, pregnant):
+    rr = trunc_norm(16, 2, 12, 28)
+
+    if age > 60:
+        rr += 1
+    if activity == "high":
+        rr += random.uniform(5, 10)
+    if activity == "moderate":
+        rr += random.uniform(2, 5)
+
+    # Conditions
+    if bmi >= 30:
+        rr += 2
+    if pregnant:
+        rr += 2
+    if "COPD" in problems:
+        rr += 3
+    if "asthma" in problems:
+        rr += 2
+    if "anemia" in problems:
+        rr += 2
+    if "thyroid_disorder" in problems and random.random() < 0.5:  # hyper
+        rr += 2
+    if "thyroid_disorder" in problems and random.random() >= 0.5:  # hypo
+        rr -= 2
+
+    if "stress" in problems or "chronic_pain" in problems:
+        rr += 1
+
     return round(rr, 1)
 
-# Function to generate data based on user_id and time
-def generate_data(user_id=1, time=None):
-    # If time is not passed, use the current time by default
-    if time is None:
-        time = datetime.datetime.now()
+# -------------------- Scenario injection helpers ------------------- #
 
-    # Get user profile
-    age, gender, health_condition, altitude, fitness_level, medications = create_user_profile()
-    
-    # Random activity level for the user at this hour
-    activity_level = random.choice(["low", "moderate", "high"])
+DURATION_MAP = {
+    "asthma_attack": lambda: random.randint(10, 30),        # minutes
+    "panic_attack": lambda: random.randint(10, 20),
+    "febrile_sepsis": lambda: random.randint(240, 480),
+    "post_op_infection": lambda: random.randint(360, 720),
+}
 
-    # Simulate health data
-    hr = simulate_heart_rate(time, activity_level, age, health_condition, fitness_level, medications)
-    temp = simulate_temperature(time, health_condition, age, altitude, activity_level)
-    systolic, diastolic = simulate_blood_pressure(time, activity_level, health_condition, age, medications)
-    spo2 = simulate_spo2(altitude, health_condition)
-    rr = simulate_rr(time, activity_level, health_condition, age)
 
-    # Return data as a list for the current user at the given time
-    return [user_id, time, hr, temp, systolic, diastolic, spo2, rr, activity_level, age, gender, health_condition, fitness_level]
+def apply_scenario(row: dict, scenario: str):
+    if scenario == "febrile_sepsis":
+        row["Body_Temperature"] += 1.5
+        row["Heart_Rate"] += 30
+        row["Systolic_BP"] -= 20
+        row["Diastolic_BP"] -= 10
+    elif scenario == "asthma_attack":
+        row["SpO2"] -= 7
+        row["Respiratory_Rate"] += 6
+        row["Heart_Rate"] += 20
+    elif scenario == "panic_attack":
+        row["Heart_Rate"] += 25
+        row["Respiratory_Rate"] += 8
+        row["SpO2"] -= 2
+        row["Body_Temperature"] += 0.4
+    elif scenario == "post_op_infection":
+        row["Body_Temperature"] += 1.0
+        row["Heart_Rate"] += 20
+        row["Systolic_BP"] -= 10
+    # Clamp
+    row["SpO2"] = max(row["SpO2"], 70)
+    row["Heart_Rate"] = min(row["Heart_Rate"], 220)
 
-# Function to display data (generate data for multiple users)
-def user_data(num_users):
-    data = []
-    current_time = datetime.datetime.now()
-    for user_id in range(1, num_users + 1):
-        user_data = generate_data(user_id, current_time)
-        data.append(user_data)
+# -------------------- Row generator --------------------- #
 
-    # Display the data in a table format
-    df = pd.DataFrame(data, columns=["User_ID", "Timestamp", "Heart_Rate", "Body_Temperature", "Systolic_BP", "Diastolic_BP", "SpO2", "Respiratory_Rate", "Activity_Level", "Age", "Gender", "Health_Condition", "Fitness_Level"])
-    return df
+def generate_row(user_id: int, ts: datetime.datetime, profile: tuple) -> dict:
+    age, gender, probs, altitude, fit, bmi, pregnant = profile
+    activity = random.choices(["low", "moderate", "high"], [0.4, 0.4, 0.2])[0]
 
-# Function to generate data across a given number of hours (does not loop back after 24 hours)
-def hours_data(num_hours=24):
-    data = []
-    user_id = 1
-    current_time = datetime.datetime.now()
-    
-    # Start from the current hour and generate the data for the given number of hours
-    for hour in range(num_hours): 
-        time = current_time + datetime.timedelta(hours=hour)  # Increase hour sequentially
-        user_data = generate_data(user_id, time)
-        data.append(user_data)
+    hr = simulate_heart_rate(ts.hour, activity, age, probs, fit, bmi, pregnant)
+    temp = simulate_temperature(ts.hour, probs, age, altitude, activity, bmi, pregnant)
+    sys, dia = simulate_blood_pressure(ts.hour, activity, probs, age, bmi, pregnant)
+    spo2 = simulate_spo2(altitude, probs, bmi, pregnant)
+    rr = simulate_rr(ts.hour, activity, probs, age, bmi, pregnant)
 
-    df = pd.DataFrame(data, columns=["User_ID", "Timestamp", "Heart_Rate", "Body_Temperature", "Systolic_BP", "Diastolic_BP", "SpO2", "Respiratory_Rate", "Activity_Level", "Age", "Gender", "Health_Condition", "Fitness_Level"])
+    return {"User_ID": user_id, "Timestamp": ts,
+            "Heart_Rate": hr, "Body_Temperature": temp,
+            "Systolic_BP": sys, "Diastolic_BP": dia,
+            "SpO2": spo2, "Respiratory_Rate": rr,
+            "Scenario": "normal"}
 
-    return df
 
-# Plot HR data for given number of users at current time
-print(user_data(10))
+def user_data(n=10):
+    now = datetime.datetime.now()
+    rows = [generate_row(uid, now, create_user_profile()) for uid in range(1, n + 1)]
+    return pd.DataFrame(rows)
 
-# Plot HR data for one user for given number of hours
-hours = hours_data(30)
-plt.plot(hours["Timestamp"], hours["Heart_Rate"])
-plt.xlabel("Time")
-plt.ylabel("Heart Rate (BPM)")
-plt.title(f"Simulated Heart Rate for User 1 on {datetime.datetime.now().strftime('%Y-%m-%d')}")
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+
+def hours_data(hours: int = 24, scenario: str | None = None):
+    start = datetime.datetime.now().replace(minute=0, second=0, microsecond=0)
+    profile = create_user_profile()
+
+    timestamps = pd.date_range(start, periods=hours, freq="H")
+    rows = [generate_row(1, ts.to_pydatetime(), profile) for ts in timestamps]
+
+    if scenario in DURATION_MAP:
+        dur_min = DURATION_MAP[scenario]()
+        dur_hr  = max(1, dur_min // 60)          # convert to hours
+        start_hr = random.randint(0, hours - dur_hr)
+        for i in range(start_hr, start_hr + dur_hr):
+            apply_scenario(rows[i], scenario)
+            rows[i]["Scenario"] = scenario
+
+    for row in rows:
+        for key in ("Heart_Rate", "Body_Temperature", "Systolic_BP", "SpO2", "Respiratory_Rate"):
+            if random.random() < 0.03:
+                row[key] = np.nan
+
+    return pd.DataFrame(rows)
+
+# -------------------- Minute‑level series generator --------------------- #
+
+def minutes_data(minutes: int = 1440, scenario: str | None = None):
+    """Return a 1‑minute cadence dataframe for a single user."""
+    start = datetime.datetime.now().replace(second=0, microsecond=0)
+    profile = create_user_profile()
+    times = [start + datetime.timedelta(minutes=i) for i in range(minutes)]
+
+    rows = [generate_row(1, ts, profile) for ts in times]
+
+    # Inject scenario with realistic duration
+    if scenario in DURATION_MAP:
+        dur = DURATION_MAP[scenario]()
+        if dur >= minutes:  # too long for series
+            dur = minutes // 2
+        start_idx = random.randint(0, minutes - dur)
+        for i in range(start_idx, start_idx + dur):
+            apply_scenario(rows[i], scenario)
+            rows[i]["Scenario"] = scenario
+
+    # 3 % random NaN artifacts
+    for row in rows:
+        for key in ("Heart_Rate", "Body_Temperature", "Systolic_BP", "SpO2", "Respiratory_Rate"):
+            if random.random() < 0.03:
+                row[key] = np.nan
+
+    return pd.DataFrame(rows)
+
+# ----------------------------- Demo ----------------------------- #
+
+if __name__ == "__main__":
+
+    df1 = user_data(5)
+    df2 = hours_data(48, scenario="panic_attack")
+    df3 = minutes_data(60, scenario="panic_attack")
+
+    print(df1)
+    print(df2[df2["Scenario"] != "normal"])
+
+    plt.plot(df3["Timestamp"], df3["Heart_Rate"])
+    plt.title("HR with Panic Attack")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()

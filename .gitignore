@@ -1,5 +1,7 @@
-# Ignore the virtual environment directory
-venv/
+# Ignore virtual environments
+.venv/
+dnn_env/
+env/
 
 # Ignore Python bytecode files
 *.pyc
@@ -11,3 +13,5 @@ __pycache__/
 *.log
 *.bak
 *.swp
+
+
