@@ -1,29 +1,33 @@
-1. Overview
+BioTrack: Heart Attack Risk Prediction System
+BioTrack is a machine learning-based web application designed to predict heart attack risk using health data. Built with a focus on accuracy, interpretability, and accessibility, the system enables users to receive real-time predictions and understand the key contributing factors behind them.
 
-BioTrackAI is a comprehensive health monitoring system designed to track and analyze key vital signs in the human body. By simulating real-time data from various wearable sensors. BioTrackAI allows users to continuously monitor their health metrics with ease. The system uses advanced algorithms to analyze the data, detecting any anomalies or potential health risks such as abnormal heart rates, low oxygen levels, high blood pressure, or respiratory issues. Whenever irregularities are detected, the system provides timely alerts, ensuring that users are informed and 
-can take necessary actions.
+Features
+High-Accuracy Prediction Model (94% accuracy on test set)
 
-The system features a user-friendly web dashboard that displays health data in an intuitive, easy-to-understand format, allowing users to visualize trends in their vital signs over time. It is ideal for individuals looking to actively manage their health, such as fitness enthusiasts and elderly people who may need constant monitoring. It empowers users to take proactive steps toward improving their health and well-being by providing easy access to important health insights in real time.
+SHAP Explainability for feature importance at an individual level
 
-2. Code Structure
+Dual-Source Dataset for model robustness (train/test)
 
-   1. Simulation: The simulation component is responsible for generating real-time health data, such as heart rate, temperature, blood pressure, and oxygen levels. 
+Prediction vs Actual Plotting for model evaluation
 
-   2. Backend: The backend serves as the core of the system, responsible for processing and storing the simulated health data.
+Web-Based User Interface for interactive use
 
-   3. Data Analysis: Data analysis is crucial for processing the incoming health data and detecting any anomalies or irregularities in the metrics. The system analyzes the data to identify patterns and trends, such as abnormally high or low heart rates, fever, or low oxygen levels. It helps in generating timely alerts when a health metric deviates from the normal range, ensuring the user's safety and prompt action.
+Secure and Scalable Architecture ready for deployment
 
-   4. Frontend: The frontend provides a user-friendly interface to display real-time health data and trends. 
+Tech Stack
+Languages: Python
 
-   5. Hosting: Hosting ensures that the application is deployed and accessible via the cloud. Using cloud platforms like AWS, it automates the deployment process, making the application scalable, secure, and available to users across various devices.
+Model Type: Integration of Random Forest and DNN MODEL
 
-   6. AI Assistant (optional): This feature provides a conversational interface for users. It helps users understand their health data by answering questions about their metrics and giving recommendations based on the data. 
+Libraries: scikit-learn, NumPy, Pandas, SHAP, Matplotlib, Seaborn
 
-3. Tools Used in BioTrackAI
+Web UI (planned): Streamlit / Flask (depending on final implementation)
 
-Simulation: Python (`random`, `time`, `json`)  
-Backend: Flask, SQLite/AWS RDS    
-Data Analysis: Scikit-learn, NumPy, Pandas 
-Frontend: React, Chart.js 
-Hosting: AWS EC2, AWS S3, AWS Lambda, AWS RDS | S
-AI Assistant (Optional): LangChain, OpenAI GPT
+Model Performance
+Accuracy: 94% on test data
+
+Evaluation Metrics: Confusion matrix, prediction vs. actual plots
+
+Feature Importance: Provided via SHAP values for transparency
+
+
