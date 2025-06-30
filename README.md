@@ -1,33 +1,49 @@
-BioTrack: Heart Attack Risk Prediction System
-BioTrack is a machine learning-based web application designed to predict heart attack risk using health data. Built with a focus on accuracy, interpretability, and accessibility, the system enables users to receive real-time predictions and understand the key contributing factors behind them.
+# BioTrack: Heart Attack Risk Prediction System
 
-Features
-High-Accuracy Prediction Model (94% accuracy on test set)
+**BioTrack** is a machine learning-based application built to predict heart attack risk using clinical and lifestyle health data. With a focus on **accuracy**, **explainability**, and **user accessibility**, BioTrack empowers individuals and healthcare professionals with real-time predictions and insight into contributing health factors.
 
-SHAP Explainability for feature importance at an individual level
+---
 
-Dual-Source Dataset for model robustness (train/test)
+## 🚀 Features
 
-Prediction vs Actual Plotting for model evaluation
+- **High-Accuracy Prediction** — Achieves **94% accuracy** on the test set  
+- **SHAP Explainability** — Understand **why** a prediction was made  
+- **Hybrid Model** — Combines **Random Forest** + **Deep Neural Network (DNN)**  
+- **Evaluation Tools** — Confusion matrix, ROC AUC, F1 score, and more  
+- **Web-Based Interface** — (Planned) Interactive UI via **Streamlit** or **Flask**  
+- **Secure & Scalable** — Architecture ready for deployment and scaling
 
-Web-Based User Interface for interactive use
+---
 
-Secure and Scalable Architecture ready for deployment
+## Tech Stack
 
-Tech Stack
-Languages: Python
+- **Languages**: Python  
+- **Model**: Hybrid of `RandomForestClassifier` & custom `DNN`  
+- **Libraries**:  
+  - `scikit-learn`  
+  - `pandas`, `numpy`  
+  - `shap`, `matplotlib`, `seaborn`  
+  - `torch` (for DNN)
 
-Model Type: Integration of Random Forest and DNN MODEL
+---
 
-Libraries: scikit-learn, NumPy, Pandas, SHAP, Matplotlib, Seaborn
+## Model Performance
 
-Web UI (planned): Streamlit / Flask (depending on final implementation)
+- **Accuracy**: `94%` on held-out test data  
+- **Metrics**:
+  - Precision, Recall, F1 Score, AUC-ROC  
+  - Confusion Matrix  
+  - Predicted vs Actual Probability plots
 
-Model Performance
-Accuracy: 94% on test data
+- **Explainability**:
+  - SHAP bar plots & beeswarm plots for **global** and **individual** feature impact  
+  - Plots auto-saved as `.png` for easy visualization
+ 
+---
 
-Evaluation Metrics: Confusion matrix, prediction vs. actual plots
+ ## Dataset Attribution
 
-Feature Importance: Provided via SHAP values for transparency
+This project uses the [Patients Data for Medical Field](https://www.kaggle.com/datasets/tarekmuhammed/patients-data-for-medical-field) dataset by **Tarek Muhammed** (Kaggle).  
+The dataset is used under Kaggle’s [terms of use](https://www.kaggle.com/terms) for research and educational purposes.
 
-
+---
